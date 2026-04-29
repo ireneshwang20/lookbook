@@ -186,7 +186,14 @@ export default function Canvas({
         className="rounded-md shadow-lg"
       >
         <Layer>
-          <Rect x={0} y={0} width={width} height={height} fill={background} />
+          <Rect
+            x={0}
+            y={0}
+            width={width}
+            height={height}
+            fill={background}
+            listening={false}
+          />
           <Text
             text={title}
             x={0}
