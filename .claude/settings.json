@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "COUNTER=\"/Users/irenehwang/Desktop/lookbook/.claude/.readme_counter\"; n=$(cat \"$COUNTER\" 2>/dev/null || echo 0); n=$((n+1)); echo \"$n\" > \"$COUNTER\"; if [ $((n % 5)) -eq 0 ]; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"%s tool calls reached since the last reminder. Per user preference, consider updating README.md in /Users/irenehwang/Desktop/lookbook to reflect recent changes (new features, dependencies, structure). Skip silently if nothing material has changed.\"}}\\n' \"$n\"; fi"
+          }
+        ]
+      }
+    ]
+  }
+}
