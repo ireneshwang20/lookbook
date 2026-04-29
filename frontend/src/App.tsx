@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type Konva from "konva";
+import { jsPDF } from "jspdf";
 import Canvas, { LookbookItem } from "./components/Canvas";
 import AddFromLink, { NewItem } from "./components/AddFromLink";
 
@@ -114,6 +115,7 @@ export default function App() {
         id: uid(),
         src: newItem.imageUrl,
         brand: newItem.brand,
+        sourceUrl: newItem.sourceUrl,
         x: STAGE_WIDTH / 2 + (Math.random() - 0.5) * 200,
         y: STAGE_HEIGHT / 2 + (Math.random() - 0.5) * 100,
         scale,
@@ -168,6 +170,45 @@ export default function App() {
     a.href = dataURL;
     a.download = `lookbook-page-${currentPageIndex + 1}-${Date.now()}.png`;
     a.click();
+  }
+
+  const [exportingPdf, setExportingPdf] = useState(false);
+
+  async function handleExportPDF() {
+    if (exportingPdf) return;
+    setExportingPdf(true);
+    const original = currentPageIndex;
+    setSelectedId(null);
+    try {
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "px",
+        format: [STAGE_WIDTH, STAGE_HEIGHT],
+        compress: true,
+      });
+      for (let i = 0; i < pages.length; i++) {
+        setCurrentPageIndex(i);
+        // Wait two animation frames so React commits and Konva redraws.
+        await new Promise<void>((resolve) =>
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => resolve())
+          )
+        );
+        const stage = stageRef.current;
+        if (!stage) continue;
+        const dataURL = stage.toDataURL({
+          pixelRatio: 2,
+          mimeType: "image/jpeg",
+          quality: 0.92,
+        });
+        if (i > 0) pdf.addPage([STAGE_WIDTH, STAGE_HEIGHT], "landscape");
+        pdf.addImage(dataURL, "JPEG", 0, 0, STAGE_WIDTH, STAGE_HEIGHT);
+      }
+      pdf.save(`lookbook-${Date.now()}.pdf`);
+    } finally {
+      setCurrentPageIndex(original);
+      setExportingPdf(false);
+    }
   }
 
   function addPage() {
@@ -335,6 +376,16 @@ export default function App() {
             className="rounded bg-stone-900 px-3 py-2 text-sm font-medium text-white"
           >
             Export PNG (page {currentPageIndex + 1})
+          </button>
+          <button
+            type="button"
+            onClick={handleExportPDF}
+            disabled={exportingPdf}
+            className="rounded border border-stone-900 px-3 py-2 text-sm font-medium text-stone-900 disabled:opacity-50"
+          >
+            {exportingPdf
+              ? "Building PDF…"
+              : `Export PDF (${pages.length} page${pages.length === 1 ? "" : "s"})`}
           </button>
         </section>
       </aside>

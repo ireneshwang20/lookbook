@@ -6,6 +6,7 @@ export interface LookbookItem {
   id: string;
   src: string;
   brand: string | null;
+  sourceUrl: string | null;
   x: number;
   y: number;
   scale: number;
@@ -104,14 +105,38 @@ function ItemNode({
       />
       {item.brand && (
         <Text
-          text={`▸ ${item.brand.toUpperCase()}`}
+          text={`▸ ${item.brand.toUpperCase()}${
+            isSelected && item.sourceUrl ? "  ↗" : ""
+          }`}
           x={item.x + (baseW * item.scale) / 2 + 8}
           y={item.y - 6}
           fontFamily="Inter"
           fontSize={11}
           fontStyle="600"
           fill="#1a1a1a"
-          listening={false}
+          listening={isSelected && !!item.sourceUrl}
+          onClick={(e) => {
+            if (isSelected && item.sourceUrl) {
+              e.cancelBubble = true;
+              window.open(item.sourceUrl, "_blank", "noopener,noreferrer");
+            }
+          }}
+          onTap={(e) => {
+            if (isSelected && item.sourceUrl) {
+              e.cancelBubble = true;
+              window.open(item.sourceUrl, "_blank", "noopener,noreferrer");
+            }
+          }}
+          onMouseEnter={(e) => {
+            if (isSelected && item.sourceUrl) {
+              const stage = e.target.getStage();
+              if (stage) stage.container().style.cursor = "pointer";
+            }
+          }}
+          onMouseLeave={(e) => {
+            const stage = e.target.getStage();
+            if (stage) stage.container().style.cursor = "default";
+          }}
         />
       )}
       {isSelected && (
