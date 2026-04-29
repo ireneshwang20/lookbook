@@ -41,10 +41,16 @@ subsequent cutouts run from cache.
 4. The proxied URL is piped into `@imgly/background-removal`, producing a
    transparent PNG blob.
 5. The blob becomes a draggable, resizable, rotatable Konva node on the canvas
-   with the brand auto-labeled next to it.
+   with the brand auto-labeled next to it. Items drop at a sensible initial
+   scale based on the cutout's natural height (~320px tall, not blown up).
 6. The canvas auto-scales to fit the available viewport (logical resolution
    stays at 1200x900 so exports keep their quality).
-7. **Export PNG** rasterizes the stage at 2x and triggers a download.
+7. **Export PNG** rasterizes the current page's stage at 2x and triggers a
+   download.
+
+The form is non-blocking: paste a second URL while the first is still
+processing, keep dragging items, switch pages — nothing waits on the cutout
+queue. Per-task progress shows below the input.
 
 ## Project layout
 
@@ -62,9 +68,20 @@ lookbook/
 │   └── vite.config.ts               proxies /api → http://127.0.0.1:5174
 └── backend/
     └── src/
-        ├── server.ts                Fastify app + CORS + /scrape route
-        └── scrape.ts                OG tags + JSON-LD product extractor
+        ├── server.ts                Fastify app + CORS + /scrape and /proxy-image
+        └── scrape.ts                OG tags + JSON-LD product/ProductGroup extractor
 ```
+
+## Editing
+
+- **Inline text editing.** Double-click the title, subtitle, or "1 OUTFIT
+  PACKAGE" pill on the canvas to edit it in place. Enter or Esc commits.
+- **Multi-page lookbooks.** Sidebar has page tabs with `+`, Duplicate, and
+  Delete; each page owns its own items, background, title, subtitle, and pill.
+- **Bring to front.** Clicking an item moves it to the top of the z-stack so
+  it can sit on top of any others.
+- **Delete shortcut.** Selected item + Delete or Backspace removes it (the
+  shortcut is suppressed while typing in inputs).
 
 ## Roadmap
 
@@ -74,6 +91,7 @@ lookbook/
 - Site-specific scrapers / headless-browser fallback for retailers that block
   basic fetches (Zara, Nike, etc.)
 - More decoration stamps, text presets, and export sizes (story, pin, print)
+- Multi-page export (PDF or zip of PNGs); current export is per-page
 
 ## Known limitations
 
