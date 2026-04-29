@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { scrapeProduct } from "../lib/api";
+import { scrapeProduct, proxyImageUrl } from "../lib/api";
 import { cutoutImage, blobToObjectURL } from "../lib/bgRemove";
 
 export interface NewItem {
@@ -31,7 +31,7 @@ export default function AddFromLink({ onAdd }: Props) {
       const scraped = await scrapeProduct(url.trim());
       setPhase("cutout");
       setProgress("removing background…");
-      const cutout = await cutoutImage(scraped.imageUrl, {
+      const cutout = await cutoutImage(proxyImageUrl(scraped.imageUrl), {
         onProgress: (key, current, total) => {
           if (total > 0) {
             setProgress(`${key} ${Math.round((current / total) * 100)}%`);

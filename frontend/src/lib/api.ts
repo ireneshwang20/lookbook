@@ -15,10 +15,10 @@ export async function scrapeProduct(url: string): Promise<ScrapeResult> {
   return res.json();
 }
 
-export async function fetchImageAsBlob(imageUrl: string): Promise<Blob> {
-  // Try direct first; if CORS blocks, route through a future proxy endpoint.
-  // For now, the @imgly/background-removal lib accepts a URL string directly.
-  const res = await fetch(imageUrl, { mode: "cors" });
-  if (!res.ok) throw new Error(`failed to fetch image: ${res.status}`);
-  return res.blob();
+export function proxyImageUrl(imageUrl: string): string {
+  // Absolute URL so libraries (e.g. @imgly/background-removal) don't resolve
+  // relative paths against their own resources base.
+  return `${window.location.origin}/api/proxy-image?url=${encodeURIComponent(
+    imageUrl
+  )}`;
 }
