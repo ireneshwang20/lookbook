@@ -43,6 +43,22 @@ export async function scrapeProduct(url: string): Promise<ScrapeResult> {
     throw new Error(`fetch failed: ${res.status} ${res.statusText}`);
   }
   const html = await res.text();
+
+  // Some retailers (Gentle Monster, Zara, Nike, etc.) return a 200/202 with an
+  // anti-bot challenge page instead of the real product HTML. Detect the
+  // common signatures so the user sees a useful error instead of "no image".
+  const looksLikeBotChallenge =
+    res.status === 202 ||
+    (html.length < 4000 &&
+      /awsWaf|aws-waf-token|cf-browser-verification|cf-mitigated|just a moment|checking your browser|access denied|enable javascript and cookies/i.test(
+        html
+      ));
+  if (looksLikeBotChallenge) {
+    throw new Error(
+      "this retailer's site is behind a bot-protection wall (AWS WAF, Cloudflare, etc.) and won't serve a real page to our scraper — try uploading the image directly instead"
+    );
+  }
+
   const $ = cheerio.load(html);
 
   const meta = (sel: string) => $(sel).attr("content")?.trim() || null;

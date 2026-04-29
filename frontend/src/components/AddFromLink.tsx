@@ -6,7 +6,7 @@ export interface NewItem {
   imageUrl: string;
   brand: string | null;
   title: string | null;
-  sourceUrl: string;
+  sourceUrl: string | null;
 }
 
 interface Props {
@@ -91,6 +91,49 @@ export default function AddFromLink({ onAdd }: Props) {
     }
   }
 
+  async function handleFile(file: File) {
+    const taskId = `t${++taskCounter}`;
+    const label = file.name.length > 24 ? file.name.slice(0, 24) + "…" : file.name;
+    setTasks((prev) => [
+      ...prev,
+      { id: taskId, label, phase: "cutout", progress: "removing background…" },
+    ]);
+    const sourceBlobUrl = URL.createObjectURL(file);
+    try {
+      const cutout = await cutoutImage(sourceBlobUrl, {
+        onProgress: (key, current, total) => {
+          if (total > 0) {
+            const pct = Math.round((current / total) * 100);
+            setTasks((prev) =>
+              prev.map((t) =>
+                t.id === taskId ? { ...t, progress: `${key} ${pct}%` } : t
+              )
+            );
+          }
+        },
+      });
+      onAdd({
+        imageUrl: blobToObjectURL(cutout),
+        brand: null,
+        title: file.name,
+        sourceUrl: null,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setErrors((prev) => [...prev, { id: taskId, label, message }]);
+    } finally {
+      URL.revokeObjectURL(sourceBlobUrl);
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    }
+  }
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files) return;
+    Array.from(files).forEach(handleFile);
+    e.target.value = "";
+  }
+
   function dismissError(id: string) {
     setErrors((prev) => prev.filter((e) => e.id !== id));
   }
@@ -116,6 +159,17 @@ export default function AddFromLink({ onAdd }: Props) {
           Add
         </button>
       </div>
+
+      <label className="flex cursor-pointer items-center justify-center gap-2 rounded border border-dashed border-stone-300 px-3 py-2 text-xs text-stone-500 hover:border-stone-500 hover:text-stone-700">
+        or upload an image
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={onFileChange}
+          className="hidden"
+        />
+      </label>
 
       {tasks.length > 0 && (
         <ul className="flex flex-col gap-1 text-xs text-stone-500">
