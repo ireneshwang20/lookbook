@@ -27,6 +27,7 @@ export default function App() {
   const [subtitle, setSubtitle] = useState(
     "SERVICES INCLUDE CURATED DIGITAL LOOKBOOKS WITH CLICKABLE LINKS, STYLE RECOMMENDATIONS, ETC.."
   );
+  const [pill, setPill] = useState("1 OUTFIT PACKAGE");
   const stageRef = useRef<Konva.Stage | null>(null);
   const mainRef = useRef<HTMLElement | null>(null);
   const [scale, setScale] = useState(1);
@@ -193,10 +194,14 @@ export default function App() {
               background={bg}
               title={title}
               subtitle={subtitle}
+              pill={pill}
               items={items}
               selectedId={selectedId}
               onSelect={setSelectedId}
               onUpdate={handleUpdate}
+              onChangeTitle={setTitle}
+              onChangeSubtitle={setSubtitle}
+              onChangePill={setPill}
               stageRef={stageRef}
             />
           </div>

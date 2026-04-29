@@ -18,12 +18,18 @@ interface Props {
   background: string;
   title: string;
   subtitle: string;
+  pill: string;
   items: LookbookItem[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onUpdate: (id: string, patch: Partial<LookbookItem>) => void;
+  onChangeTitle: (s: string) => void;
+  onChangeSubtitle: (s: string) => void;
+  onChangePill: (s: string) => void;
   stageRef?: React.MutableRefObject<Konva.Stage | null>;
 }
+
+type EditingField = "title" | "subtitle" | "pill" | null;
 
 function useImage(src: string): HTMLImageElement | null {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
@@ -134,10 +140,14 @@ export default function Canvas({
   background,
   title,
   subtitle,
+  pill,
   items,
   selectedId,
   onSelect,
   onUpdate,
+  onChangeTitle,
+  onChangeSubtitle,
+  onChangePill,
   stageRef,
 }: Props) {
   const internalStageRef = useRef<Konva.Stage | null>(null);
@@ -146,112 +156,275 @@ export default function Canvas({
     if (stageRef) stageRef.current = s;
   };
 
+  const [editing, setEditing] = useState<EditingField>(null);
+
   const titleX = useMemo(() => width / 2, [width]);
+  const titleFontSize = Math.round(width * 0.075);
+  const titleY = 70;
+  const subtitleY = titleY + titleFontSize + 10;
+  const pillX = titleX - 90;
+  const pillTextY = 36;
+
+  const setTextCursor = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    const stage = e.target.getStage();
+    if (stage) stage.container().style.cursor = "text";
+  };
+  const resetCursor = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    const stage = e.target.getStage();
+    if (stage) stage.container().style.cursor = "default";
+  };
 
   return (
-    <Stage
-      ref={setStage}
-      width={width}
-      height={height}
-      onMouseDown={(e) => {
-        if (e.target === e.target.getStage()) onSelect(null);
-      }}
-      className="rounded-md shadow-lg"
-    >
-      <Layer>
-        <Rect x={0} y={0} width={width} height={height} fill={background} />
-        <Text
-          text={title}
-          x={0}
-          y={70}
-          width={width}
-          align="center"
-          fontFamily="Cormorant Garamond"
-          fontSize={Math.round(width * 0.075)}
-          fontStyle="500"
-          fill="#1a1a1a"
-          listening={false}
-        />
-        <Text
-          text={subtitle}
-          x={0}
-          y={70 + Math.round(width * 0.075) + 10}
-          width={width}
-          align="center"
-          fontFamily="Inter"
-          fontSize={11}
-          fontStyle="400"
-          letterSpacing={2}
-          fill="#3a3a3a"
-          listening={false}
-        />
-        {/* sparkle stamps */}
-        <Text
-          text="✦"
-          x={40}
-          y={140}
-          fontSize={28}
-          fill="#1a1a1a"
-          listening={false}
-        />
-        <Text
-          text="✦"
-          x={width - 70}
-          y={180}
-          fontSize={20}
-          fill="#1a1a1a"
-          listening={false}
-        />
-        <Text
-          text="✦"
-          x={60}
-          y={height - 90}
-          fontSize={22}
-          fill="#1a1a1a"
-          listening={false}
-        />
-        <Text
-          text="✦"
-          x={width - 90}
-          y={height - 70}
-          fontSize={26}
-          fill="#1a1a1a"
-          listening={false}
-        />
-        {/* title pill outline */}
-        <Rect
-          x={titleX - 90}
-          y={28}
-          width={180}
-          height={32}
-          cornerRadius={20}
-          stroke="#1a1a1a"
-          strokeWidth={1}
-        />
-        <Text
-          text="1 OUTFIT PACKAGE"
-          x={titleX - 90}
-          y={36}
-          width={180}
-          align="center"
-          fontFamily="Inter"
-          fontSize={12}
-          fontStyle="600"
-          letterSpacing={2}
-          fill="#1a1a1a"
-          listening={false}
-        />
-
-        {items.map((item) => (
-          <ItemNode
-            key={item.id}
-            item={item}
-            isSelected={item.id === selectedId}
-            onSelect={() => onSelect(item.id)}
-            onUpdate={(patch) => onUpdate(item.id, patch)}
+    <div style={{ position: "relative", width, height }}>
+      <Stage
+        ref={setStage}
+        width={width}
+        height={height}
+        onMouseDown={(e) => {
+          if (e.target === e.target.getStage()) onSelect(null);
+        }}
+        className="rounded-md shadow-lg"
+      >
+        <Layer>
+          <Rect x={0} y={0} width={width} height={height} fill={background} />
+          <Text
+            text={title}
+            x={0}
+            y={titleY}
+            width={width}
+            align="center"
+            fontFamily="Cormorant Garamond"
+            fontSize={titleFontSize}
+            fontStyle="500"
+            fill="#1a1a1a"
+            visible={editing !== "title"}
+            onDblClick={() => setEditing("title")}
+            onDblTap={() => setEditing("title")}
+            onMouseEnter={setTextCursor}
+            onMouseLeave={resetCursor}
           />
-        ))}
-      </Layer>
-    </Stage>
+          <Text
+            text={subtitle}
+            x={0}
+            y={subtitleY}
+            width={width}
+            align="center"
+            fontFamily="Inter"
+            fontSize={11}
+            fontStyle="400"
+            letterSpacing={2}
+            fill="#3a3a3a"
+            visible={editing !== "subtitle"}
+            onDblClick={() => setEditing("subtitle")}
+            onDblTap={() => setEditing("subtitle")}
+            onMouseEnter={setTextCursor}
+            onMouseLeave={resetCursor}
+          />
+          {/* sparkle stamps */}
+          <Text
+            text="✦"
+            x={40}
+            y={140}
+            fontSize={28}
+            fill="#1a1a1a"
+            listening={false}
+          />
+          <Text
+            text="✦"
+            x={width - 70}
+            y={180}
+            fontSize={20}
+            fill="#1a1a1a"
+            listening={false}
+          />
+          <Text
+            text="✦"
+            x={60}
+            y={height - 90}
+            fontSize={22}
+            fill="#1a1a1a"
+            listening={false}
+          />
+          <Text
+            text="✦"
+            x={width - 90}
+            y={height - 70}
+            fontSize={26}
+            fill="#1a1a1a"
+            listening={false}
+          />
+          {/* title pill outline */}
+          <Rect
+            x={pillX}
+            y={28}
+            width={180}
+            height={32}
+            cornerRadius={20}
+            stroke="#1a1a1a"
+            strokeWidth={1}
+          />
+          <Text
+            text={pill}
+            x={pillX}
+            y={pillTextY}
+            width={180}
+            align="center"
+            fontFamily="Inter"
+            fontSize={12}
+            fontStyle="600"
+            letterSpacing={2}
+            fill="#1a1a1a"
+            visible={editing !== "pill"}
+            onDblClick={() => setEditing("pill")}
+            onDblTap={() => setEditing("pill")}
+            onMouseEnter={setTextCursor}
+            onMouseLeave={resetCursor}
+          />
+
+          {items.map((item) => (
+            <ItemNode
+              key={item.id}
+              item={item}
+              isSelected={item.id === selectedId}
+              onSelect={() => onSelect(item.id)}
+              onUpdate={(patch) => onUpdate(item.id, patch)}
+            />
+          ))}
+        </Layer>
+      </Stage>
+
+      {editing === "title" && (
+        <EditOverlay
+          defaultValue={title}
+          onCommit={(v) => {
+            onChangeTitle(v);
+            setEditing(null);
+          }}
+          style={{
+            top: titleY,
+            left: 0,
+            width,
+            height: titleFontSize * 1.3,
+            fontFamily: '"Cormorant Garamond", Didot, Georgia, serif',
+            fontSize: titleFontSize,
+            fontWeight: 500,
+            textAlign: "center",
+            color: "#1a1a1a",
+            lineHeight: 1.2,
+          }}
+        />
+      )}
+      {editing === "subtitle" && (
+        <EditOverlay
+          defaultValue={subtitle}
+          onCommit={(v) => {
+            onChangeSubtitle(v);
+            setEditing(null);
+          }}
+          style={{
+            top: subtitleY,
+            left: 0,
+            width,
+            height: 32,
+            fontFamily: "Inter, system-ui, sans-serif",
+            fontSize: 11,
+            fontWeight: 400,
+            letterSpacing: "2px",
+            textAlign: "center",
+            color: "#3a3a3a",
+            lineHeight: 1.4,
+          }}
+        />
+      )}
+      {editing === "pill" && (
+        <EditOverlay
+          defaultValue={pill}
+          onCommit={(v) => {
+            onChangePill(v);
+            setEditing(null);
+          }}
+          singleLine
+          style={{
+            top: pillTextY,
+            left: pillX,
+            width: 180,
+            height: 20,
+            fontFamily: "Inter, system-ui, sans-serif",
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: "2px",
+            textAlign: "center",
+            color: "#1a1a1a",
+            lineHeight: 1.2,
+            textTransform: "uppercase",
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function EditOverlay({
+  defaultValue,
+  onCommit,
+  style,
+  singleLine = false,
+}: {
+  defaultValue: string;
+  onCommit: (value: string) => void;
+  style: React.CSSProperties;
+  singleLine?: boolean;
+}) {
+  const ref = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    el.select();
+  }, []);
+
+  const baseStyle: React.CSSProperties = {
+    position: "absolute",
+    border: "none",
+    outline: "1px dashed rgba(26,26,26,0.35)",
+    background: "rgba(255,255,255,0.4)",
+    padding: 0,
+    margin: 0,
+    resize: "none",
+    overflow: "hidden",
+    ...style,
+  };
+
+  if (singleLine) {
+    return (
+      <input
+        ref={ref as React.RefObject<HTMLInputElement>}
+        defaultValue={defaultValue}
+        style={baseStyle}
+        onBlur={(e) => onCommit(e.currentTarget.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === "Escape") {
+            e.preventDefault();
+            e.currentTarget.blur();
+          }
+        }}
+      />
+    );
+  }
+
+  return (
+    <textarea
+      ref={ref as React.RefObject<HTMLTextAreaElement>}
+      defaultValue={defaultValue}
+      style={baseStyle}
+      onBlur={(e) => onCommit(e.currentTarget.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Escape" || (e.key === "Enter" && !e.shiftKey)) {
+          e.preventDefault();
+          e.currentTarget.blur();
+        }
+      }}
+    />
   );
 }
