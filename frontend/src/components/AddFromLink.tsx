@@ -13,28 +13,66 @@ interface Props {
   onAdd: (item: NewItem) => void;
 }
 
-type Phase = "idle" | "scraping" | "cutout" | "error";
+interface Task {
+  id: string;
+  label: string;
+  phase: "scraping" | "cutout";
+  progress: string;
+}
+
+interface FailedTask {
+  id: string;
+  label: string;
+  message: string;
+}
+
+function shortLabel(url: string): string {
+  try {
+    const u = new URL(url);
+    return u.hostname.replace(/^www\./, "");
+  } catch {
+    return url.slice(0, 32);
+  }
+}
+
+let taskCounter = 0;
 
 export default function AddFromLink({ onAdd }: Props) {
   const [url, setUrl] = useState("");
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [progress, setProgress] = useState<string>("");
-  const [error, setError] = useState<string | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [errors, setErrors] = useState<FailedTask[]>([]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!url.trim()) return;
-    setError(null);
-    setPhase("scraping");
-    setProgress("fetching product…");
+    const submitted = url.trim();
+    if (!submitted) return;
+
+    const taskId = `t${++taskCounter}`;
+    const label = shortLabel(submitted);
+    setTasks((prev) => [
+      ...prev,
+      { id: taskId, label, phase: "scraping", progress: "fetching product…" },
+    ]);
+    setUrl("");
+
     try {
-      const scraped = await scrapeProduct(url.trim());
-      setPhase("cutout");
-      setProgress("removing background…");
+      const scraped = await scrapeProduct(submitted);
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId
+            ? { ...t, phase: "cutout", progress: "removing background…" }
+            : t
+        )
+      );
       const cutout = await cutoutImage(proxyImageUrl(scraped.imageUrl), {
         onProgress: (key, current, total) => {
           if (total > 0) {
-            setProgress(`${key} ${Math.round((current / total) * 100)}%`);
+            const pct = Math.round((current / total) * 100);
+            setTasks((prev) =>
+              prev.map((t) =>
+                t.id === taskId ? { ...t, progress: `${key} ${pct}%` } : t
+              )
+            );
           }
         },
       });
@@ -45,16 +83,17 @@ export default function AddFromLink({ onAdd }: Props) {
         title: scraped.title,
         sourceUrl: scraped.sourceUrl,
       });
-      setUrl("");
-      setPhase("idle");
-      setProgress("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setPhase("error");
+      const message = err instanceof Error ? err.message : String(err);
+      setErrors((prev) => [...prev, { id: taskId, label, message }]);
+    } finally {
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
     }
   }
 
-  const busy = phase === "scraping" || phase === "cutout";
+  function dismissError(id: string) {
+    setErrors((prev) => prev.filter((e) => e.id !== id));
+  }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2">
@@ -67,33 +106,45 @@ export default function AddFromLink({ onAdd }: Props) {
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://www.zara.com/..."
-          disabled={busy}
-          className="flex-1 rounded border border-stone-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-stone-900 disabled:opacity-50"
+          className="flex-1 rounded border border-stone-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-stone-900"
         />
         <button
           type="submit"
-          disabled={busy || !url.trim()}
+          disabled={!url.trim()}
           className="rounded bg-stone-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
         >
-          {busy ? "…" : "Add"}
+          Add
         </button>
       </div>
-      {busy && <p className="text-xs text-stone-500">{progress}</p>}
-      {error && (
-        <p className="text-xs text-red-600 break-words">
-          {error}{" "}
+
+      {tasks.length > 0 && (
+        <ul className="flex flex-col gap-1 text-xs text-stone-500">
+          {tasks.map((t) => (
+            <li key={t.id} className="flex items-center gap-2">
+              <span
+                className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-stone-900"
+                aria-hidden
+              />
+              <span className="truncate">
+                {t.label} — {t.progress}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {errors.map((err) => (
+        <p key={err.id} className="text-xs text-red-600 break-words">
+          {err.label}: {err.message}{" "}
           <button
             type="button"
-            onClick={() => {
-              setError(null);
-              setPhase("idle");
-            }}
+            onClick={() => dismissError(err.id)}
             className="underline"
           >
             dismiss
           </button>
         </p>
-      )}
+      ))}
     </form>
   );
 }

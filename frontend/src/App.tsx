@@ -145,6 +145,21 @@ export default function App() {
     setSelectedId(null);
   }
 
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (!selectedId) return;
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || t?.isContentEditable) return;
+      e.preventDefault();
+      handleRemoveSelected();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, currentPageIndex]);
+
   function handleExport() {
     const stage = stageRef.current;
     if (!stage) return;
@@ -309,9 +324,10 @@ export default function App() {
             type="button"
             onClick={handleRemoveSelected}
             disabled={!selectedId}
+            title="Delete selected (Delete or Backspace)"
             className="rounded border border-stone-300 px-3 py-2 text-sm disabled:opacity-40"
           >
-            Delete selected
+            Delete selected ⌫
           </button>
           <button
             type="button"
