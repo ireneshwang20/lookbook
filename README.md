@@ -9,8 +9,9 @@ export the result as a PNG.
 
 - **Frontend:** Vite + React 19 + TypeScript + Tailwind + react-konva
 - **Background removal:** [@imgly/background-removal](https://github.com/imgly/background-removal-js) (in-browser via WASM/ONNX — no GPU server, no per-image API cost)
-- **Backend:** Fastify + cheerio (single `/scrape` endpoint that resolves Open
-  Graph tags and JSON-LD product schema)
+- **Backend:** Fastify + cheerio with two endpoints — `/scrape` (Open Graph +
+  JSON-LD product extraction) and `/proxy-image` (same-origin pass-through for
+  product images so the browser-side bg-removal lib isn't blocked by CORS)
 - **Storage:** none yet (state is in-memory; refresh = lose work)
 
 ## Quick start
@@ -32,11 +33,18 @@ subsequent cutouts run from cache.
 1. You paste a product URL into the sidebar.
 2. The frontend hits `/api/scrape` (proxied to `:5174`); the backend fetches
    the page, parses Open Graph + JSON-LD, returns `{ imageUrl, brand, title }`.
-3. The frontend pipes `imageUrl` into `@imgly/background-removal` to produce a
+3. To dodge cross-origin CDN blocks, the frontend rewrites `imageUrl` to
+   `/api/proxy-image?url=...` (absolute, same-origin). The backend fetches the
+   image with an Accept header that excludes AVIF (most CDNs do content
+   negotiation and fall back to WebP/JPEG/PNG, which the bg-removal lib can
+   actually decode).
+4. The proxied URL is piped into `@imgly/background-removal`, producing a
    transparent PNG blob.
-4. The blob becomes a draggable, resizable, rotatable Konva node on the canvas
+5. The blob becomes a draggable, resizable, rotatable Konva node on the canvas
    with the brand auto-labeled next to it.
-5. **Export PNG** rasterizes the stage at 2x and triggers a download.
+6. The canvas auto-scales to fit the available viewport (logical resolution
+   stays at 1200x900 so exports keep their quality).
+7. **Export PNG** rasterizes the stage at 2x and triggers a download.
 
 ## Project layout
 
@@ -73,4 +81,6 @@ lookbook/
 - The background-removal model is solid for clothing but struggles with hair,
   lace, and fully transparent fabric. A `remove.bg` API fallback is the natural
   upgrade if quality matters more than cost.
+- A few CDNs return AVIF unconditionally regardless of the Accept header — those
+  cutouts will fail until we add server-side AVIF→PNG conversion (sharp).
 - No multi-user support, no auth — solo tool by design.
