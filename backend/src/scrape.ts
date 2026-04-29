@@ -11,6 +11,24 @@ export interface ScrapeResult {
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15";
 
+function pickImage(value: unknown): string | null {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const picked = pickImage(entry);
+      if (picked) return picked;
+    }
+    return null;
+  }
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    if (typeof obj.url === "string") return obj.url;
+    if (typeof obj.contentUrl === "string") return obj.contentUrl;
+  }
+  return null;
+}
+
 export async function scrapeProduct(url: string): Promise<ScrapeResult> {
   const res = await fetch(url, {
     headers: {
@@ -62,17 +80,25 @@ export async function scrapeProduct(url: string): Promise<ScrapeResult> {
       for (const item of items) {
         if (!item || typeof item !== "object") continue;
         const type = item["@type"];
-        const isProduct =
-          type === "Product" ||
-          (Array.isArray(type) && type.includes("Product"));
+        const matchesType = (t: string) =>
+          type === t || (Array.isArray(type) && type.includes(t));
+        const isProduct = matchesType("Product") || matchesType("ProductGroup");
         if (!isProduct) continue;
+
         if (!imageUrl) {
-          const img = item.image;
-          if (typeof img === "string") imageUrl = img;
-          else if (Array.isArray(img) && img.length) {
-            imageUrl = typeof img[0] === "string" ? img[0] : img[0]?.url ?? null;
-          } else if (img?.url) imageUrl = img.url;
+          imageUrl = pickImage(item.image);
         }
+        // ProductGroup may delegate the image to its first variant
+        if (!imageUrl && Array.isArray(item.hasVariant)) {
+          for (const variant of item.hasVariant) {
+            const fromVariant = pickImage(variant?.image);
+            if (fromVariant) {
+              imageUrl = fromVariant;
+              break;
+            }
+          }
+        }
+
         if (!brand) {
           const b = item.brand;
           if (typeof b === "string") brand = b;
