@@ -8,7 +8,8 @@ export the result as a PNG.
 ## Stack
 
 - **Frontend:** Vite + React 19 + TypeScript + Tailwind + react-konva
-- **Background removal:** [@imgly/background-removal](https://github.com/imgly/background-removal-js) (in-browser via WASM/ONNX — no GPU server, no per-image API cost)
+- **Background removal:** [@imgly/background-removal](https://github.com/imgly/background-removal-js) running inside a dedicated Web Worker — keeps the main thread free so dragging, resizing, and editing existing items stays responsive while new cutouts process. No GPU server, no per-image API cost.
+- **PDF export:** [jsPDF](https://github.com/parallax/jsPDF) — multi-page PDF assembled by rendering each lookbook page at 2x retina.
 - **Backend:** Fastify + cheerio with two endpoints — `/scrape` (Open Graph +
   JSON-LD product extraction) and `/proxy-image` (same-origin pass-through for
   product images so the browser-side bg-removal lib isn't blocked by CORS)
@@ -46,11 +47,13 @@ subsequent cutouts run from cache.
 6. The canvas auto-scales to fit the available viewport (logical resolution
    stays at 1200x900 so exports keep their quality).
 7. **Export PNG** rasterizes the current page's stage at 2x and triggers a
-   download.
+   download. **Export PDF** does the same for every page, assembled into one
+   document.
 
 The form is non-blocking: paste a second URL while the first is still
 processing, keep dragging items, switch pages — nothing waits on the cutout
-queue. Per-task progress shows below the input.
+queue. The bg-removal model runs inside a Web Worker so even active inference
+doesn't freeze the canvas. Per-task progress shows below the input.
 
 ## Project layout
 
@@ -82,16 +85,18 @@ lookbook/
   it can sit on top of any others.
 - **Delete shortcut.** Selected item + Delete or Backspace removes it (the
   shortcut is suppressed while typing in inputs).
+- **Click through to source.** A selected item's brand label gains a small `↗`
+  marker; clicking the label opens the original product page in a new tab.
 
 ## Roadmap
 
-- Save / load lookbooks to disk (JSON + PNG snapshot)
-- Palette extraction → suggested background colors that match the items
-- Smarter auto-placement (currently items drop near center, manual arrange)
+- Persistence — auto-save lookbooks to IndexedDB so refreshes don't lose
+  work; cutouts need to live there too since blob URLs are session-only.
+- Palette extraction → suggested background colors that match the items.
+- Smarter auto-placement (currently items drop near center, manual arrange).
 - Site-specific scrapers / headless-browser fallback for retailers that block
-  basic fetches (Zara, Nike, etc.)
-- More decoration stamps, text presets, and export sizes (story, pin, print)
-- Multi-page export (PDF or zip of PNGs); current export is per-page
+  basic fetches (Zara, Nike, etc.).
+- More decoration stamps, text presets, and export sizes (story, pin, print).
 
 ## Known limitations
 
