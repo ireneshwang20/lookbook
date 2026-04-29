@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type Konva from "konva";
 import Canvas, { LookbookItem } from "./components/Canvas";
 import AddFromLink, { NewItem } from "./components/AddFromLink";
@@ -28,6 +28,26 @@ export default function App() {
     "SERVICES INCLUDE CURATED DIGITAL LOOKBOOKS WITH CLICKABLE LINKS, STYLE RECOMMENDATIONS, ETC.."
   );
   const stageRef = useRef<Konva.Stage | null>(null);
+  const mainRef = useRef<HTMLElement | null>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    const update = () => {
+      const padding = 64;
+      const fit = Math.min(
+        (el.clientWidth - padding) / STAGE_WIDTH,
+        (el.clientHeight - padding) / STAGE_HEIGHT,
+        1
+      );
+      setScale(Math.max(fit, 0.05));
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   function handleAdd(newItem: NewItem) {
     setItems((prev) => [
@@ -100,12 +120,17 @@ export default function App() {
               </button>
             ))}
           </div>
-          <input
-            type="color"
-            value={bg}
-            onChange={(e) => setBg(e.target.value)}
-            className="h-8 w-full rounded border border-stone-300"
-          />
+          <label className="flex items-center gap-2">
+            <input
+              type="color"
+              value={bg}
+              onChange={(e) => setBg(e.target.value)}
+              className="color-input h-9 w-12 rounded border border-stone-300"
+            />
+            <span className="font-mono text-xs uppercase text-stone-600">
+              {bg}
+            </span>
+          </label>
         </section>
 
         <section className="flex flex-col gap-2">
@@ -144,26 +169,37 @@ export default function App() {
         </section>
       </aside>
 
-      <main className="flex flex-1 items-center justify-center overflow-auto p-8">
+      <main
+        ref={mainRef}
+        className="flex flex-1 items-center justify-center overflow-hidden p-8"
+      >
         <div
           style={{
-            width: STAGE_WIDTH,
-            height: STAGE_HEIGHT,
-            transformOrigin: "center",
+            width: STAGE_WIDTH * scale,
+            height: STAGE_HEIGHT * scale,
           }}
         >
-          <Canvas
-            width={STAGE_WIDTH}
-            height={STAGE_HEIGHT}
-            background={bg}
-            title={title}
-            subtitle={subtitle}
-            items={items}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onUpdate={handleUpdate}
-            stageRef={stageRef}
-          />
+          <div
+            style={{
+              width: STAGE_WIDTH,
+              height: STAGE_HEIGHT,
+              transform: `scale(${scale})`,
+              transformOrigin: "top left",
+            }}
+          >
+            <Canvas
+              width={STAGE_WIDTH}
+              height={STAGE_HEIGHT}
+              background={bg}
+              title={title}
+              subtitle={subtitle}
+              items={items}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onUpdate={handleUpdate}
+              stageRef={stageRef}
+            />
+          </div>
         </div>
       </main>
     </div>
