@@ -14,20 +14,49 @@ const PRESETS = [
 
 const STAGE_WIDTH = 1200;
 const STAGE_HEIGHT = 900;
+const TARGET_ITEM_HEIGHT = 320;
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+function loadImageDimensions(
+  url: string
+): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.onload = () =>
+      resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => reject(new Error("image load failed"));
+    img.src = url;
+  });
+}
+
+interface Page {
+  id: string;
+  items: LookbookItem[];
+  bg: string;
+  title: string;
+  subtitle: string;
+  pill: string;
+}
+
+function createDefaultPage(): Page {
+  return {
+    id: uid(),
+    items: [],
+    bg: PRESETS[0].color,
+    title: "YOUR PERSONAL STYLIST",
+    subtitle:
+      "SERVICES INCLUDE CURATED DIGITAL LOOKBOOKS WITH CLICKABLE LINKS, STYLE RECOMMENDATIONS, ETC..",
+    pill: "1 OUTFIT PACKAGE",
+  };
+}
+
 export default function App() {
-  const [items, setItems] = useState<LookbookItem[]>([]);
+  const [pages, setPages] = useState<Page[]>(() => [createDefaultPage()]);
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [bg, setBg] = useState(PRESETS[0].color);
-  const [title, setTitle] = useState("YOUR PERSONAL STYLIST");
-  const [subtitle, setSubtitle] = useState(
-    "SERVICES INCLUDE CURATED DIGITAL LOOKBOOKS WITH CLICKABLE LINKS, STYLE RECOMMENDATIONS, ETC.."
-  );
-  const [pill, setPill] = useState("1 OUTFIT PACKAGE");
   const stageRef = useRef<Konva.Stage | null>(null);
   const mainRef = useRef<HTMLElement | null>(null);
   const [scale, setScale] = useState(1);
@@ -50,8 +79,36 @@ export default function App() {
     return () => ro.disconnect();
   }, []);
 
-  function handleAdd(newItem: NewItem) {
-    setItems((prev) => [
+  const currentPage = pages[currentPageIndex];
+
+  function patchCurrentPage(patch: Partial<Page>) {
+    setPages((prev) =>
+      prev.map((p, i) => (i === currentPageIndex ? { ...p, ...patch } : p))
+    );
+  }
+
+  function updateItems(updater: (prev: LookbookItem[]) => LookbookItem[]) {
+    setPages((prev) =>
+      prev.map((p, i) =>
+        i === currentPageIndex ? { ...p, items: updater(p.items) } : p
+      )
+    );
+  }
+
+  const setBg = (bg: string) => patchCurrentPage({ bg });
+  const setTitle = (title: string) => patchCurrentPage({ title });
+  const setSubtitle = (subtitle: string) => patchCurrentPage({ subtitle });
+  const setPill = (pill: string) => patchCurrentPage({ pill });
+
+  async function handleAdd(newItem: NewItem) {
+    let scale = 0.25;
+    try {
+      const dims = await loadImageDimensions(newItem.imageUrl);
+      scale = Math.min(TARGET_ITEM_HEIGHT / dims.height, 1);
+    } catch {
+      // fall back to default scale
+    }
+    updateItems((prev) => [
       ...prev,
       {
         id: uid(),
@@ -59,21 +116,32 @@ export default function App() {
         brand: newItem.brand,
         x: STAGE_WIDTH / 2 + (Math.random() - 0.5) * 200,
         y: STAGE_HEIGHT / 2 + (Math.random() - 0.5) * 100,
-        scale: 0.4,
+        scale,
         rotation: 0,
       },
     ]);
   }
 
+  function handleSelect(id: string | null) {
+    setSelectedId(id);
+    if (!id) return;
+    updateItems((prev) => {
+      const idx = prev.findIndex((it) => it.id === id);
+      if (idx === -1 || idx === prev.length - 1) return prev;
+      const item = prev[idx];
+      return [...prev.slice(0, idx), ...prev.slice(idx + 1), item];
+    });
+  }
+
   function handleUpdate(id: string, patch: Partial<LookbookItem>) {
-    setItems((prev) =>
+    updateItems((prev) =>
       prev.map((it) => (it.id === id ? { ...it, ...patch } : it))
     );
   }
 
   function handleRemoveSelected() {
     if (!selectedId) return;
-    setItems((prev) => prev.filter((it) => it.id !== selectedId));
+    updateItems((prev) => prev.filter((it) => it.id !== selectedId));
     setSelectedId(null);
   }
 
@@ -83,8 +151,42 @@ export default function App() {
     const dataURL = stage.toDataURL({ pixelRatio: 2, mimeType: "image/png" });
     const a = document.createElement("a");
     a.href = dataURL;
-    a.download = `lookbook-${Date.now()}.png`;
+    a.download = `lookbook-page-${currentPageIndex + 1}-${Date.now()}.png`;
     a.click();
+  }
+
+  function addPage() {
+    const newPage = createDefaultPage();
+    setPages((prev) => [...prev, newPage]);
+    setCurrentPageIndex(pages.length);
+    setSelectedId(null);
+  }
+
+  function duplicatePage() {
+    const dup: Page = {
+      ...currentPage,
+      id: uid(),
+      items: currentPage.items.map((it) => ({ ...it, id: uid() })),
+    };
+    setPages((prev) => {
+      const next = [...prev];
+      next.splice(currentPageIndex + 1, 0, dup);
+      return next;
+    });
+    setCurrentPageIndex(currentPageIndex + 1);
+    setSelectedId(null);
+  }
+
+  function deleteCurrentPage() {
+    if (pages.length <= 1) return;
+    setPages((prev) => prev.filter((_, i) => i !== currentPageIndex));
+    setCurrentPageIndex((idx) => Math.max(0, idx - (idx === pages.length - 1 ? 1 : 0)));
+    setSelectedId(null);
+  }
+
+  function gotoPage(i: number) {
+    setCurrentPageIndex(i);
+    setSelectedId(null);
   }
 
   return (
@@ -101,6 +203,54 @@ export default function App() {
 
         <section className="flex flex-col gap-2">
           <label className="text-xs uppercase tracking-widest text-stone-500">
+            Pages
+          </label>
+          <div className="flex flex-wrap gap-1.5">
+            {pages.map((p, i) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => gotoPage(i)}
+                className={`flex h-8 w-8 items-center justify-center rounded border text-xs font-medium ${
+                  i === currentPageIndex
+                    ? "border-stone-900 bg-stone-900 text-white"
+                    : "border-stone-300 bg-white text-stone-700 hover:border-stone-500"
+                }`}
+                title={`Page ${i + 1}`}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={addPage}
+              className="flex h-8 w-8 items-center justify-center rounded border border-dashed border-stone-400 bg-white text-base text-stone-500 hover:border-stone-900 hover:text-stone-900"
+              title="Add new page"
+            >
+              +
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={duplicatePage}
+              className="flex-1 rounded border border-stone-300 px-2 py-1.5 text-xs text-stone-700 hover:border-stone-500"
+            >
+              Duplicate
+            </button>
+            <button
+              type="button"
+              onClick={deleteCurrentPage}
+              disabled={pages.length <= 1}
+              className="flex-1 rounded border border-stone-300 px-2 py-1.5 text-xs text-stone-700 hover:border-red-500 hover:text-red-600 disabled:opacity-40 disabled:hover:border-stone-300 disabled:hover:text-stone-700"
+            >
+              Delete page
+            </button>
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-2">
+          <label className="text-xs uppercase tracking-widest text-stone-500">
             Background
           </label>
           <div className="grid grid-cols-3 gap-2">
@@ -110,11 +260,14 @@ export default function App() {
                 type="button"
                 onClick={() => setBg(p.color)}
                 className={`flex h-12 flex-col items-center justify-end rounded border text-[10px] ${
-                  bg === p.color
+                  currentPage.bg === p.color
                     ? "border-stone-900 ring-1 ring-stone-900"
                     : "border-stone-300"
                 }`}
-                style={{ background: p.color, color: p.color === "#1F1F1F" ? "#fff" : "#1a1a1a" }}
+                style={{
+                  background: p.color,
+                  color: p.color === "#1F1F1F" ? "#fff" : "#1a1a1a",
+                }}
                 title={p.name}
               >
                 <span className="pb-1">{p.name}</span>
@@ -124,12 +277,12 @@ export default function App() {
           <label className="flex items-center gap-2">
             <input
               type="color"
-              value={bg}
+              value={currentPage.bg}
               onChange={(e) => setBg(e.target.value)}
               className="color-input h-9 w-12 rounded border border-stone-300"
             />
             <span className="font-mono text-xs uppercase text-stone-600">
-              {bg}
+              {currentPage.bg}
             </span>
           </label>
         </section>
@@ -139,12 +292,12 @@ export default function App() {
             Title
           </label>
           <input
-            value={title}
+            value={currentPage.title}
             onChange={(e) => setTitle(e.target.value)}
             className="rounded border border-stone-300 bg-white px-3 py-2 text-sm"
           />
           <textarea
-            value={subtitle}
+            value={currentPage.subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
             rows={2}
             className="rounded border border-stone-300 bg-white px-3 py-2 text-xs"
@@ -165,7 +318,7 @@ export default function App() {
             onClick={handleExport}
             className="rounded bg-stone-900 px-3 py-2 text-sm font-medium text-white"
           >
-            Export PNG
+            Export PNG (page {currentPageIndex + 1})
           </button>
         </section>
       </aside>
@@ -189,15 +342,16 @@ export default function App() {
             }}
           >
             <Canvas
+              key={currentPage.id}
               width={STAGE_WIDTH}
               height={STAGE_HEIGHT}
-              background={bg}
-              title={title}
-              subtitle={subtitle}
-              pill={pill}
-              items={items}
+              background={currentPage.bg}
+              title={currentPage.title}
+              subtitle={currentPage.subtitle}
+              pill={currentPage.pill}
+              items={currentPage.items}
               selectedId={selectedId}
-              onSelect={setSelectedId}
+              onSelect={handleSelect}
               onUpdate={handleUpdate}
               onChangeTitle={setTitle}
               onChangeSubtitle={setSubtitle}
