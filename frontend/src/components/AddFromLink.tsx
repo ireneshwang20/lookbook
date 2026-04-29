@@ -35,6 +35,39 @@ function shortLabel(url: string): string {
   }
 }
 
+// The bg-removal lib doesn't accept AVIF (and HEIC isn't decodable in
+// non-Safari browsers). We re-decode every upload through <img> + canvas and
+// re-emit as PNG so the worker always sees a format it can handle.
+async function transcodeToPng(file: File): Promise<Blob> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () =>
+        reject(
+          new Error(
+            "could not decode this image — the browser doesn't recognise its format (try a JPEG or PNG)"
+          )
+        );
+      i.src = url;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("canvas 2d context unavailable");
+    ctx.drawImage(img, 0, 0);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob((b) => resolve(b), "image/png")
+    );
+    if (!blob) throw new Error("PNG encoding failed");
+    return blob;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 let taskCounter = 0;
 
 export default function AddFromLink({ onAdd }: Props) {
@@ -98,8 +131,10 @@ export default function AddFromLink({ onAdd }: Props) {
       ...prev,
       { id: taskId, label, phase: "cutout", progress: "removing background…" },
     ]);
-    const sourceBlobUrl = URL.createObjectURL(file);
+    let sourceBlobUrl: string | null = null;
     try {
+      const safeBlob = await transcodeToPng(file);
+      sourceBlobUrl = URL.createObjectURL(safeBlob);
       const cutout = await cutoutImage(sourceBlobUrl, {
         onProgress: (key, current, total) => {
           if (total > 0) {
@@ -122,7 +157,7 @@ export default function AddFromLink({ onAdd }: Props) {
       const message = err instanceof Error ? err.message : String(err);
       setErrors((prev) => [...prev, { id: taskId, label, message }]);
     } finally {
-      URL.revokeObjectURL(sourceBlobUrl);
+      if (sourceBlobUrl) URL.revokeObjectURL(sourceBlobUrl);
       setTasks((prev) => prev.filter((t) => t.id !== taskId));
     }
   }
