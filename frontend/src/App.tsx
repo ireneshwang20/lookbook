@@ -81,6 +81,9 @@ export default function App() {
   }, []);
 
   const currentPage = pages[currentPageIndex];
+  const selectedItem = selectedId
+    ? currentPage.items.find((it) => it.id === selectedId) ?? null
+    : null;
 
   function patchCurrentPage(patch: Partial<Page>) {
     setPages((prev) =>
@@ -359,6 +362,39 @@ export default function App() {
             className="rounded border border-stone-300 bg-white px-3 py-2 text-xs"
           />
         </section>
+
+        {selectedItem && (
+          <section className="flex flex-col gap-2 rounded border border-stone-200 bg-white p-3">
+            <label className="text-xs uppercase tracking-widest text-stone-500">
+              Selected item
+            </label>
+            <input
+              placeholder="Brand (e.g. ETRO)"
+              value={selectedItem.brand ?? ""}
+              onChange={(e) =>
+                handleUpdate(selectedItem.id, {
+                  brand: e.target.value || null,
+                })
+              }
+              className="rounded border border-stone-300 bg-white px-3 py-2 text-sm"
+            />
+            <input
+              type="url"
+              placeholder="Source link (optional)"
+              value={selectedItem.sourceUrl ?? ""}
+              onChange={(e) =>
+                handleUpdate(selectedItem.id, {
+                  sourceUrl: e.target.value || null,
+                })
+              }
+              className="rounded border border-stone-300 bg-white px-3 py-2 text-xs"
+            />
+            <p className="text-[10px] text-stone-500">
+              Brand shows next to the item; if a link is set, the brand label
+              becomes clickable when the item is selected.
+            </p>
+          </section>
+        )}
 
         <section className="mt-auto flex flex-col gap-2">
           <button
