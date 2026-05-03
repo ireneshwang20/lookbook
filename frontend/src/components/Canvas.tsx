@@ -9,8 +9,13 @@ export interface LookbookItem {
   sourceUrl: string | null;
   x: number;
   y: number;
-  scale: number;
+  scaleX: number;
+  scaleY: number;
   rotation: number;
+  // Label position is stored as an offset from item.x/item.y so dragging the
+  // item carries its label along; dragging the label only updates the offset.
+  labelOffsetX: number;
+  labelOffsetY: number;
 }
 
 interface Props {
@@ -83,8 +88,8 @@ function ItemNode({
         y={item.y}
         offsetX={baseW / 2}
         offsetY={baseH / 2}
-        scaleX={item.scale}
-        scaleY={item.scale}
+        scaleX={item.scaleX}
+        scaleY={item.scaleY}
         rotation={item.rotation}
         draggable
         onClick={onSelect}
@@ -95,11 +100,11 @@ function ItemNode({
         onTransformEnd={() => {
           const node = groupRef.current;
           if (!node) return;
-          const newScale = node.scaleX();
           onUpdate({
             x: node.x(),
             y: node.y(),
-            scale: newScale,
+            scaleX: node.scaleX(),
+            scaleY: node.scaleY(),
             rotation: node.rotation(),
           });
         }}
@@ -109,29 +114,41 @@ function ItemNode({
           text={`▸ ${item.brand.toUpperCase()}${
             isSelected && item.sourceUrl ? "  ↗" : ""
           }`}
-          x={item.x + (baseW * item.scale) / 2 + 8}
-          y={item.y - 6}
+          x={item.x + item.labelOffsetX}
+          y={item.y + item.labelOffsetY}
           fontFamily="Inter"
           fontSize={11}
           fontStyle="600"
           fill="#1a1a1a"
-          listening={isSelected && !!item.sourceUrl}
+          draggable
           onClick={(e) => {
-            if (isSelected && item.sourceUrl) {
-              e.cancelBubble = true;
+            e.cancelBubble = true;
+            if (item.sourceUrl) {
               window.open(item.sourceUrl, "_blank", "noopener,noreferrer");
+            } else {
+              onSelect();
             }
           }}
           onTap={(e) => {
-            if (isSelected && item.sourceUrl) {
-              e.cancelBubble = true;
+            e.cancelBubble = true;
+            if (item.sourceUrl) {
               window.open(item.sourceUrl, "_blank", "noopener,noreferrer");
+            } else {
+              onSelect();
             }
           }}
+          onDragEnd={(e) => {
+            onUpdate({
+              labelOffsetX: e.target.x() - item.x,
+              labelOffsetY: e.target.y() - item.y,
+            });
+          }}
           onMouseEnter={(e) => {
-            if (isSelected && item.sourceUrl) {
-              const stage = e.target.getStage();
-              if (stage) stage.container().style.cursor = "pointer";
+            const stage = e.target.getStage();
+            if (stage) {
+              stage.container().style.cursor = item.sourceUrl
+                ? "pointer"
+                : "move";
             }
           }}
           onMouseLeave={(e) => {
@@ -146,8 +163,12 @@ function ItemNode({
           rotateEnabled
           enabledAnchors={[
             "top-left",
+            "top-center",
             "top-right",
+            "middle-left",
+            "middle-right",
             "bottom-left",
+            "bottom-center",
             "bottom-right",
           ]}
           boundBoxFunc={(oldBox, newBox) => {

@@ -106,11 +106,13 @@ export default function App() {
 
   async function handleAdd(newItem: NewItem) {
     let scale = 0.25;
+    let renderedHalfWidth = 100;
     try {
       const dims = await loadImageDimensions(newItem.imageUrl);
       scale = Math.min(TARGET_ITEM_HEIGHT / dims.height, 1);
+      renderedHalfWidth = (dims.width * scale) / 2;
     } catch {
-      // fall back to default scale
+      // fall back to defaults
     }
     updateItems((prev) => [
       ...prev,
@@ -121,8 +123,11 @@ export default function App() {
         sourceUrl: newItem.sourceUrl,
         x: STAGE_WIDTH / 2 + (Math.random() - 0.5) * 200,
         y: STAGE_HEIGHT / 2 + (Math.random() - 0.5) * 100,
-        scale,
+        scaleX: scale,
+        scaleY: scale,
         rotation: 0,
+        labelOffsetX: renderedHalfWidth + 8,
+        labelOffsetY: -6,
       },
     ]);
   }
