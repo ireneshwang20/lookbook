@@ -78,6 +78,13 @@ function ItemNode({
   const baseW = img.width;
   const baseH = img.height;
 
+  // Defensive defaults — items created before scaleX/scaleY/labelOffset
+  // existed shouldn't render at NaN or scale=undefined.
+  const scaleX = item.scaleX ?? 1;
+  const scaleY = item.scaleY ?? 1;
+  const labelOffsetX = item.labelOffsetX ?? (baseW * scaleX) / 2 + 8;
+  const labelOffsetY = item.labelOffsetY ?? -6;
+
   return (
     <>
       <KonvaImage
@@ -88,8 +95,8 @@ function ItemNode({
         y={item.y}
         offsetX={baseW / 2}
         offsetY={baseH / 2}
-        scaleX={item.scaleX}
-        scaleY={item.scaleY}
+        scaleX={scaleX}
+        scaleY={scaleY}
         rotation={item.rotation}
         draggable
         onClick={onSelect}
@@ -114,8 +121,8 @@ function ItemNode({
           text={`▸ ${item.brand.toUpperCase()}${
             isSelected && item.sourceUrl ? "  ↗" : ""
           }`}
-          x={item.x + item.labelOffsetX}
-          y={item.y + item.labelOffsetY}
+          x={item.x + labelOffsetX}
+          y={item.y + labelOffsetY}
           fontFamily="Inter"
           fontSize={11}
           fontStyle="600"
