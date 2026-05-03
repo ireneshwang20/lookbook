@@ -77,6 +77,7 @@ function ItemNode({
     <>
       <KonvaImage
         ref={groupRef}
+        id={item.id}
         image={img}
         x={item.x}
         y={item.y}

@@ -206,6 +206,17 @@ export default function App() {
         });
         if (i > 0) pdf.addPage([STAGE_WIDTH, STAGE_HEIGHT], "landscape");
         pdf.addImage(dataURL, "JPEG", 0, 0, STAGE_WIDTH, STAGE_HEIGHT);
+
+        // Add clickable link annotations on top of items that have a sourceUrl.
+        // Konva returns the rendered bounding box in stage coordinates, which
+        // already match the PDF page (we sized the page to STAGE_WIDTH x STAGE_HEIGHT).
+        for (const it of pages[i].items) {
+          if (!it.sourceUrl) continue;
+          const node = stage.findOne(`#${it.id}`);
+          if (!node) continue;
+          const box = node.getClientRect({ relativeTo: stage });
+          pdf.link(box.x, box.y, box.width, box.height, { url: it.sourceUrl });
+        }
       }
       pdf.save(`lookbook-${Date.now()}.pdf`);
     } finally {
